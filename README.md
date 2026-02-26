@@ -4,18 +4,6 @@ O **Adotei** é uma plataforma desenvolvida para centralizar e facilitar o proce
 
 ---
 
-## Itens do Projeto
-
-1.  **Levantamento de Requisitos:** Definição de funcionalidades e perfis de acesso.
-2.  **Modelo de Dados:** Diagrama Entidade-Relacionamento e escolha do SGBD.
-3.  **Arquitetura e Stack:** Definição de linguagens e frameworks.
-4.  **Versionamento:** Estruturação do ambiente no GitHub (GitFlow).
-5.  **CI/CD:** Planejamento de deploy (Render/Vercel/Railway).
-6.  **UI/UX:** Protótipos funcionais no Figma.
-7.  **Design de API:** Contratos de interface e endpoints.
-
----
-
 ## Tecnologias
 * **Banco de Dados:** MySQL
 * **Backend:** Node.js
