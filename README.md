@@ -1,6 +1,6 @@
 # Adotei
 
-O **Adotei** é uma aplicação desenvolvida para facilitar a **adoção e doação responsável de animais**, conectando pessoas interessadas em adotar com **ONGs, protetores independentes e pessoas da comunidade**.
+O **Adotei** é uma aplicação pensada para facilitar a **adoção e doação responsável de animais**, conectando pessoas interessadas em adotar com **ONGs, protetores independentes e pessoas da comunidade**.
 
 ---
 
