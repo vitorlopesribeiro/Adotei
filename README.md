@@ -19,7 +19,7 @@ O repositório segue o padrão de GitFlow simplificado e está organizado da seg
 
 ---
 
-## 📋 Itens do Projeto (Roteiro)
+## Itens do Projeto (Roteiro)
 
 1.  **Levantamento de Requisitos:** Definição de funcionalidades e perfis de acesso.
 2.  **Modelo de Dados:** Diagrama Entidade-Relacionamento e escolha do SGBD.
@@ -31,7 +31,7 @@ O repositório segue o padrão de GitFlow simplificado e está organizado da seg
 
 ---
 
-## 💻 Tecnologias
+## Tecnologias
 * **Banco de Dados:** MySQL
 * **Backend:** Node.js
 * **Frontend:** React Native
@@ -39,7 +39,7 @@ O repositório segue o padrão de GitFlow simplificado e está organizado da seg
 
 ---
 
-## 👥 Autores
+## Autores
 * **Eduarda de Lima**
 * **Nathalia Cappellini**
 * **Vitor Lopes**
