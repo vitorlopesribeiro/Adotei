@@ -1,62 +1,93 @@
-# Adotei
+# 🐾 Adotei
 
-O **Adotei** é uma aplicação pensada para facilitar a **adoção e doação responsável de animais**, conectando pessoas interessadas em adotar com **ONGs, protetores independentes e pessoas da comunidade**.
+O **Adotei** é um aplicativo mobile criado para **facilitar a adoção responsável de animais**, conectando pessoas interessadas em adotar com **doadores, ONGs e protetores independentes**.
 
-## Objetivo
+A proposta do projeto é centralizar o processo de adoção em uma plataforma simples e segura, permitindo que animais disponíveis ganhem visibilidade e encontrem novos lares com mais facilidade.
 
-O sistema tem como objetivo:
+## 📌 Sobre o Projeto
 
-- Facilitar a adoção de animais
-- Dar visibilidade para pets disponíveis
-- Conectar adotantes e doadores
-- Ajudar ONGs e protetores a gerenciar seus animais
+Hoje grande parte das adoções acontece de forma desorganizada em **redes sociais, grupos de mensagens ou publicações isoladas**, o que dificulta encontrar informações claras sobre os animais disponíveis.
+
+O **Adotei** surge como uma alternativa digital para organizar esse processo, permitindo que usuários possam:
+
+- Visualizar animais disponíveis para adoção
+- Cadastrar pets que precisam de um novo lar
+- Entrar em contato diretamente com doadores
+- Acompanhar o processo de adoção dentro do aplicativo
+
+## 🎯 Objetivos
+
+O projeto busca:
+
+- Incentivar a **adoção responsável**
+- Dar maior **visibilidade a animais disponíveis**
+- Facilitar a comunicação entre **adotantes e doadores**
+- Ajudar **ONGs e protetores independentes**
 - Reduzir o abandono de animais
 
-## Problema que o sistema resolve
+## 👥 Público-alvo
 
-O **App Adotei** surge como uma solução **simples, moderna e acessível**, permitindo que qualquer pessoa ou ONG consiga cadastrar animais para adoção de forma rápida.
+O aplicativo foi pensado para atender principalmente:
 
-## Público-alvo
+- **Pessoas** que desejam **adotar um pet**  
+- **ONGs** de **proteção animal**  
+- **Protetores independentes**  
+- **Pessoas** que precisam **doar um animal**  
 
-- Pessoas que desejam adotar um pet
-- ONGs de proteção animal
-- Protetores independentes
-- Pessoas que desejam doar animais
+## ⚙️ Funcionalidades
 
-## Funcionalidades principais
+### 👤 Gestão de Usuários
 
-### Adotante
-- Cadastro e login
-- Visualizar pets disponíveis
-- Buscar por tipo, porte, idade e localização
-- Entrar em contato para adoção
+- **Cadastro** e **Login** de usuários  
+- **Autenticação segura**  
+- **Validação de CPF**  
+- **Gerenciamento de perfil**  
 
-### Doadores / ONGs
-- Cadastro de animais para adoção
-- Edição das informações do pet
-- Exclusão de anúncios
-- Gerenciamento dos pets cadastrados
+### 🐶 Catálogo de Pets
 
-### Pets
-- Foto do animal
-- Nome
-- Idade
-- Porte
-- Sexo
-- Descrição
-- Status de adoção
+Os usuários podem visualizar animais disponíveis com diversas informações, como:
 
-## Tecnologias Utilizadas (planejadas)
+- **Fotos**  
+- **Nome**  
+- **Espécie**  
+- **Sexo**  
+- **Porte**  
+- **Idade**  
+- **Descrição**  
 
-- **Frontend Mobile:** React Native
-- **Backend:** Node.js ou Java
-- **Banco de Dados:** MySQL
-- **Controle de versão:** Git + GitHub
+Também será possível realizar buscas utilizando filtros, como:
 
-## Autores
+- **Espécie**  
+- **Porte**  
+- **Idade**  
+- **Status de adoção**  
 
-* **Eduarda Lima**
-* **Nathalia Cappellini**
-* **Vitor Lopes**
+### 💬 Comunicação
 
-Este projeto é para fins acadêmicos - Fatec 2026.
+Para facilitar o contato entre as partes:
+
+- **Integração com WhatsApp**  
+- **Compartilhamento de local de encontro via Google Maps**  
+
+## 🛠 Tecnologias Utilizadas
+
+- **React Native**  
+- **TypeScript**  
+- **Expo**  
+- **Firebase**  
+- **Cloud Firestore**  
+- **Firebase Authentication**  
+- **Firebase Storage**  
+- **Git**  
+- **GitHub**  
+
+## 👨‍💻 Equipe
+
+Projeto desenvolvido por:
+
+- **Eduarda Lima**  
+- **Nathalia Cappellini**  
+- **Vitor Lopes**  
+- **Mateus Pinheiro**  
+
+Curso: **Análise e Desenvolvimento de Sistemas — FATEC Praia Grande**
