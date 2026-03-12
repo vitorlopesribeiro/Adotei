@@ -1,110 +1,120 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { useRouter } from 'expo-router';
-import { authService } from '../../src/services/auth.service';
 
-const registerSchema = z.object({
-  name: z.string().min(3, 'Nome muito curto'),
-  email: z.string().email('E-mail inválido'),
-  password: z.string().min(6, 'A senha deve ter ao menos 6 caracteres'),
-  confirmPassword: z.string()
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "As senhas não coincidem",
-  path: ["confirmPassword"],
-});
-
-type RegisterFormData = z.infer<typeof registerSchema>;
+// Importando as regras de validação e a função de cadastro
+import { userSchema, type UserFormData } from '@/src/schemas/user.schema'; 
+import { registerUser } from '../../src/services/auth.service';
 
 export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const { control, handleSubmit, formState: { errors } } = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
+  // Configuração do formulário com TODOS os campos que o Service exige
+  const { control, handleSubmit, formState: { errors } } = useForm<UserFormData>({
+    resolver: zodResolver(userSchema),
+    defaultValues: {
+      fullName: '', email: '', password: '', cpf: '', phone: '',
+      address: { street: '', number: '', neighborhood: '', city: '', state: '', zipCode: '' }
+    }
   });
 
-  const onRegister = async (data: RegisterFormData) => {
+  // Função disparada se todos os campos estiverem preenchidos corretamente
+  const onSubmit = async (data: UserFormData) => {
     setLoading(true);
     try {
-      await authService.registerUser(data.email, data.password);
-      Alert.alert('Sucesso!', 'Sua conta foi criada com sucesso.', [
+      await registerUser(data);
+      Alert.alert('Sucesso!', 'Conta criada com sucesso!', [
         { text: 'OK', onPress: () => router.replace('/(auth)/login') }
       ]);
     } catch (error: any) {
-      let msg = 'Erro ao criar conta.';
-      if (error.code === 'auth/email-already-in-use') msg = 'Este e-mail já está em uso.';
-      Alert.alert('Erro', msg);
+      Alert.alert('Erro', error.message || 'Erro ao cadastrar.');
     } finally {
       setLoading(false);
     }
   };
 
+  // Se o botão não funcionar, ela avisa qual campo está errado no console
+  const onError = (errors: any) => {
+    console.log("Campos inválidos:", errors);
+    Alert.alert("Erro de Validação", "Preencha todos os campos obrigatórios, incluindo o endereço.");
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.logo}>🐾 Criar Conta</Text>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.logo}>🐾 Cadastro Adotei</Text>
 
-      <Text style={styles.label}>Nome</Text>
-      <Controller
-        control={control}
-        name="name"
-        render={({ field: { onChange, value } }) => (
-          <TextInput style={styles.input} placeholder="Seu nome" value={value} onChangeText={onChange} />
-        )}
-      />
-      {errors.name && <Text style={styles.error}>{errors.name.message}</Text>}
+        {/* --- DADOS PESSOAIS --- */}
+        <Text style={styles.sectionTitle}>Dados Pessoais</Text>
+        
+        <Text style={styles.label}>Nome Completo</Text>
+        <Controller control={control} name="fullName" render={({ field: { onChange, value } }) => (
+          <TextInput style={styles.input} placeholder="Ex: Maria Silva" value={value || ''} onChangeText={onChange} />
+        )} />
 
-      <Text style={styles.label}>E-mail</Text>
-      <Controller
-        control={control}
-        name="email"
-        render={({ field: { onChange, value } }) => (
-          <TextInput style={styles.input} placeholder="exemplo@email.com" value={value} onChangeText={onChange} autoCapitalize="none" keyboardType="email-address" />
-        )}
-      />
-      {errors.email && <Text style={styles.error}>{errors.email.message}</Text>}
+        <Text style={styles.label}>CPF (Apenas números)</Text>
+        <Controller control={control} name="cpf" render={({ field: { onChange, value } }) => (
+          <TextInput style={styles.input} placeholder="00000000000" value={value || ''} onChangeText={onChange} keyboardType="numeric" maxLength={11} />
+        )} />
 
-      <Text style={styles.label}>Senha</Text>
-      <Controller
-        control={control}
-        name="password"
-        render={({ field: { onChange, value } }) => (
-          <TextInput style={styles.input} placeholder="******" value={value} onChangeText={onChange} secureTextEntry />
-        )}
-      />
-      {errors.password && <Text style={styles.error}>{errors.password.message}</Text>}
+        <Text style={styles.label}>E-mail</Text>
+        <Controller control={control} name="email" render={({ field: { onChange, value } }) => (
+          <TextInput style={styles.input} placeholder="seu@email.com" value={value || ''} onChangeText={onChange} autoCapitalize="none" />
+        )} />
 
-      <Text style={styles.label}>Confirmar Senha</Text>
-      <Controller
-        control={control}
-        name="confirmPassword"
-        render={({ field: { onChange, value } }) => (
-          <TextInput style={styles.input} placeholder="******" value={value} onChangeText={onChange} secureTextEntry />
-        )}
-      />
-      {errors.confirmPassword && <Text style={styles.error}>{errors.confirmPassword.message}</Text>}
+        <Text style={styles.label}>Senha</Text>
+        <Controller control={control} name="password" render={({ field: { onChange, value } }) => (
+          <TextInput style={styles.input} placeholder="******" value={value || ''} onChangeText={onChange} secureTextEntry />
+        )} />
 
-      <TouchableOpacity style={styles.button} onPress={handleSubmit(onRegister)} disabled={loading}>
-        {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonText}>Cadastrar</Text>}
-      </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Endereço</Text>
 
-      <TouchableOpacity style={styles.link} onPress={() => router.back()}>
-        <Text style={styles.linkText}>Já tem conta? Faça login</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <Text style={styles.label}>CEP</Text>
+        <Controller control={control} name="address.zipCode" render={({ field: { onChange, value } }) => (
+          <TextInput style={styles.input} placeholder="00000000" value={value || ''} onChangeText={onChange} keyboardType="numeric" />
+        )} />
+
+        <Text style={styles.label}>Rua</Text>
+        <Controller control={control} name="address.street" render={({ field: { onChange, value } }) => (
+          <TextInput style={styles.input} placeholder="Nome da rua" value={value || ''} onChangeText={onChange} />
+        )} />
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <View style={{ width: '30%' }}>
+            <Text style={styles.label}>Nº</Text>
+            <Controller control={control} name="address.number" render={({ field: { onChange, value } }) => (
+              <TextInput style={styles.input} placeholder="123" value={value || ''} onChangeText={onChange} />
+            )} />
+          </View>
+          <View style={{ width: '65%' }}>
+            <Text style={styles.label}>Bairro</Text>
+            <Controller control={control} name="address.neighborhood" render={({ field: { onChange, value } }) => (
+              <TextInput style={styles.input} placeholder="Bairro" value={value || ''} onChangeText={onChange} />
+            )} />
+          </View>
+        </View>
+
+        <TouchableOpacity 
+          style={styles.button} 
+          onPress={handleSubmit(onSubmit, onError)} // Agora o onError vai te avisar se algo falhar
+          disabled={loading}
+        >
+          {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonText}>Cadastrar</Text>}
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 30, justifyContent: 'center', backgroundColor: '#FFF' },
-  logo: { fontSize: 28, fontWeight: 'bold', color: '#E87722', textAlign: 'center', marginBottom: 30 },
-  label: { fontSize: 14, color: '#666', marginBottom: 5, fontWeight: '500' },
-  input: { borderBottomWidth: 1, borderColor: '#DDD', padding: 10, marginBottom: 15, fontSize: 16 },
-  button: { backgroundColor: '#E87722', padding: 15, borderRadius: 8, marginTop: 20, alignItems: 'center' },
+  container: { padding: 30, backgroundColor: '#FFF' },
+  logo: { fontSize: 28, fontWeight: 'bold', color: '#E87722', textAlign: 'center', marginBottom: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#E87722', marginTop: 25, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+  label: { fontSize: 13, color: '#666', marginTop: 15, fontWeight: '600' },
+  input: { borderBottomWidth: 1, borderColor: '#DDD', padding: 8, fontSize: 15 },
+  button: { backgroundColor: '#E87722', padding: 16, borderRadius: 10, marginTop: 40, alignItems: 'center' },
   buttonText: { color: '#FFF', fontWeight: 'bold', fontSize: 18 },
-  error: { color: 'red', fontSize: 12, marginBottom: 10, marginTop: -10 },
-  link: { marginTop: 20, alignItems: 'center' },
-  linkText: { color: '#E87722', fontWeight: '500' }
 });
