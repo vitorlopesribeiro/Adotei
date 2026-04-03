@@ -1,2 +1,7 @@
-node_modules/
-.env
+adotei/node_modules/
+adotei/.expo/
+adotei/dist/
+adotei/.env
+*.log
+.claude/
+*.md
