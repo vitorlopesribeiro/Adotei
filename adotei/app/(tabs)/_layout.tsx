@@ -1,5 +1,7 @@
 import { Tabs } from 'expo-router';
 
+// Layout das tabs principais do app (navegação inferior)
+// 4 abas: Catálogo, Meus Pets, Adoções e Perfil
 export default function TabsLayout() {
   return (
     <Tabs>

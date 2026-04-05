@@ -6,58 +6,91 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
   StyleSheet,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuthStore } from '../../../src/stores/auth.store';
-import { getUserPets } from '../../../src/services/pets.service';
+import { getUserPets, deletePet } from '../../../src/services/pets.service';
+import { LoadingOverlay } from '../../../src/components/ui/LoadingOverlay';
+import { ErrorMessage } from '../../../src/components/ui/ErrorMessage';
 import { Pet, SPECIES_LABEL, PET_STATUS_LABEL, PetStatus } from '../../../src/types';
 
+// Cores dos badges de status para diferenciar visualmente
 const STATUS_COLORS: Record<PetStatus, string> = {
-  available: '#38a169',
-  pending: '#d69e2e',
-  adopted: '#3182ce',
+  available: '#38a169',  // Verde
+  pending: '#d69e2e',    // Amarelo
+  adopted: '#3182ce',    // Azul
 };
 
+// Tela "Meus Pets" — lista os pets cadastrados pelo usuário logado
 export default function MyPetsScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Função de busca extraída para poder ser chamada no retry
+  const fetchMyPets = useCallback(() => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+    getUserPets(user.uid)
+      .then((data) => setPets(data))
+      .catch(() => setError('Não foi possível carregar seus pets. Verifique sua conexão.'))
+      .finally(() => setLoading(false));
+  }, [user]);
+
+  // Recarrega a lista toda vez que a tela ganha foco
   useFocusEffect(
     useCallback(() => {
-      if (!user) return;
-      let active = true;
-
-      setLoading(true);
-      getUserPets(user.uid)
-        .then((data) => {
-          if (active) setPets(data);
-        })
-        .catch(() => {
-          if (active) setPets([]);
-        })
-        .finally(() => {
-          if (active) setLoading(false);
-        });
-
-      return () => {
-        active = false;
-      };
-    }, [user])
+      fetchMyPets();
+    }, [fetchMyPets])
   );
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#E87722" />
-      </View>
+  // Exclui um pet com confirmação (apenas status "available")
+  function handleDelete(pet: Pet) {
+    if (!user) return;
+    Alert.alert(
+      'Excluir pet',
+      `Tem certeza que deseja excluir ${pet.name}? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingId(pet.id);
+            try {
+              await deletePet(pet.id, user.uid);
+              // Remove o pet da lista local sem precisar recarregar
+              setPets((prev) => prev.filter((p) => p.id !== pet.id));
+              Alert.alert('Sucesso', 'Pet excluído com sucesso.');
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : 'Erro ao excluir pet.';
+              Alert.alert('Erro', msg);
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
+      ]
     );
+  }
+
+  if (loading) {
+    return <LoadingOverlay />;
+  }
+
+  if (error) {
+    return <ErrorMessage message={error} onRetry={fetchMyPets} />;
   }
 
   return (
     <View style={styles.container}>
+      {/* Header com botão para cadastrar novo pet */}
       <View style={styles.header}>
         <Text style={styles.title}>Meus Pets</Text>
         <TouchableOpacity
@@ -89,9 +122,33 @@ export default function MyPetsScreen() {
               <View style={styles.cardContent}>
                 <Text style={styles.cardName}>{item.name}</Text>
                 <Text style={styles.cardInfo}>{SPECIES_LABEL[item.species]}</Text>
+                {/* Badge colorido conforme o status do pet */}
                 <View style={[styles.badge, { backgroundColor: STATUS_COLORS[item.status] }]}>
                   <Text style={styles.badgeText}>{PET_STATUS_LABEL[item.status]}</Text>
                 </View>
+
+                {/* Botões de editar e excluir — visíveis apenas para pets disponíveis */}
+                {item.status === 'available' && (
+                  <View style={styles.cardActions}>
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => router.push(`/(tabs)/my-pets/${item.id}`)}
+                    >
+                      <Text style={styles.editButtonText}>Editar informações</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDelete(item)}
+                      disabled={deletingId === item.id}
+                    >
+                      {deletingId === item.id ? (
+                        <ActivityIndicator color="#e53e3e" size="small" />
+                      ) : (
+                        <Text style={styles.deleteButtonText}>Excluir</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             </View>
           )}
@@ -151,7 +208,8 @@ const styles = StyleSheet.create({
   },
   cardImage: {
     width: 100,
-    height: 100,
+    height: 'auto',
+    minHeight: 100,
   },
   cardContent: {
     flex: 1,
@@ -178,6 +236,38 @@ const styles = StyleSheet.create({
   badgeText: {
     color: '#fff',
     fontSize: 11,
+    fontWeight: '600',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  editButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E87722',
+    borderRadius: 6,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  editButtonText: {
+    color: '#E87722',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    borderWidth: 1,
+    borderColor: '#e53e3e',
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
+    color: '#e53e3e',
+    fontSize: 12,
     fontWeight: '600',
   },
   emptyText: {

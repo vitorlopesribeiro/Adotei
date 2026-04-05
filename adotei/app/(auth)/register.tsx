@@ -15,10 +15,12 @@ import { useState } from 'react';
 import { userSchema, UserFormValues } from '../../src/schemas/user.schema';
 import { registerUser } from '../../src/services/auth.service';
 
+// Tela de cadastro — cria conta no Firebase Auth + perfil no Firestore
 export default function RegisterScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
+  // React Hook Form com validação Zod (userSchema valida CPF, e-mail, etc.)
   const {
     control,
     handleSubmit,
@@ -30,12 +32,15 @@ export default function RegisterScreen() {
     },
   });
 
+  // Submete o cadastro e trata erros do Firebase Auth
   async function onSubmit(data: UserFormValues) {
     setLoading(true);
     try {
       await registerUser(data);
+      // Após cadastro bem-sucedido, redireciona direto para o catálogo
       router.replace('/(tabs)/catalog');
     } catch (error: unknown) {
+      // Trata erro de e-mail já cadastrado no Firebase Auth
       const code = (error as { code?: string }).code;
       if (code === 'auth/email-already-in-use') {
         Alert.alert('Erro', 'Este e-mail já está cadastrado.');
@@ -52,6 +57,7 @@ export default function RegisterScreen() {
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Criar conta</Text>
 
+      {/* Dados pessoais */}
       <Field label="Nome completo" error={errors.fullName?.message}>
         <Controller
           control={control}
@@ -82,6 +88,7 @@ export default function RegisterScreen() {
         />
       </Field>
 
+      {/* CPF: validado via cpf-cnpj-validator no schema Zod */}
       <Field label="CPF" error={errors.cpf?.message}>
         <Controller
           control={control}
@@ -102,6 +109,7 @@ export default function RegisterScreen() {
         />
       </Field>
 
+      {/* Seção de endereço residencial */}
       <Text style={styles.sectionTitle}>Endereço</Text>
 
       <Field label="Rua" error={errors.address?.street?.message}>
@@ -184,10 +192,12 @@ export default function RegisterScreen() {
         </View>
       </View>
 
+      {/* Botão de submit com loading */}
       <TouchableOpacity style={styles.button} onPress={handleSubmit(onSubmit)} disabled={loading}>
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Criar conta</Text>}
       </TouchableOpacity>
 
+      {/* Link para voltar à tela de login */}
       <TouchableOpacity onPress={() => router.push('/(auth)/login')} style={styles.link}>
         <Text style={styles.linkText}>Já tem conta? Entrar</Text>
       </TouchableOpacity>
@@ -195,6 +205,7 @@ export default function RegisterScreen() {
   );
 }
 
+// Componente auxiliar para campos de formulário com label e mensagem de erro
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <View style={{ marginBottom: 12 }}>

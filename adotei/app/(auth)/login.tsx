@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { loginUser } from '../../src/services/auth.service';
 
+// Schema de validação do formulário de login
 const loginSchema = z.object({
   email: z.string().email('E-mail inválido'),
   password: z.string().min(1, 'Senha obrigatória'),
@@ -23,6 +24,7 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+// Tela de login — autentica o usuário com e-mail e senha via Firebase Auth
 export default function LoginScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -35,12 +37,15 @@ export default function LoginScreen() {
     resolver: zodResolver(loginSchema),
   });
 
+  // Submete o login e trata os possíveis erros do Firebase Auth
   async function onSubmit(data: LoginFormValues) {
     setLoading(true);
     try {
       await loginUser(data.email, data.password);
+      // Após login bem-sucedido, redireciona para o catálogo
       router.replace('/(tabs)/catalog');
     } catch (error: unknown) {
+      // Trata erros específicos do Firebase Auth (credenciais inválidas)
       const code = (error as { code?: string }).code;
       if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
         Alert.alert('Erro', 'E-mail ou senha incorretos.');
@@ -60,6 +65,7 @@ export default function LoginScreen() {
       <Text style={styles.title}>Adotei</Text>
       <Text style={styles.subtitle}>Entrar na sua conta</Text>
 
+      {/* Campo de e-mail */}
       <View style={{ marginBottom: 12 }}>
         <Text style={styles.label}>E-mail</Text>
         <Controller
@@ -79,6 +85,7 @@ export default function LoginScreen() {
         {errors.email ? <Text style={styles.error}>{errors.email.message}</Text> : null}
       </View>
 
+      {/* Campo de senha */}
       <View style={{ marginBottom: 24 }}>
         <Text style={styles.label}>Senha</Text>
         <Controller
@@ -97,10 +104,12 @@ export default function LoginScreen() {
         {errors.password ? <Text style={styles.error}>{errors.password.message}</Text> : null}
       </View>
 
+      {/* Botão de login com loading */}
       <TouchableOpacity style={styles.button} onPress={handleSubmit(onSubmit)} disabled={loading}>
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Entrar</Text>}
       </TouchableOpacity>
 
+      {/* Link para tela de cadastro */}
       <TouchableOpacity onPress={() => router.push('/(auth)/register')} style={styles.link}>
         <Text style={styles.linkText}>Não tem conta? Cadastre-se</Text>
       </TouchableOpacity>

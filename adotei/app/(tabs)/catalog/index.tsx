@@ -16,6 +16,8 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { getPets } from '../../../src/services/pets.service';
 import { useFiltersStore } from '../../../src/stores/filters.store';
+import { LoadingOverlay } from '../../../src/components/ui/LoadingOverlay';
+import { ErrorMessage } from '../../../src/components/ui/ErrorMessage';
 import {
   Pet,
   PetFilters,
@@ -29,54 +31,55 @@ import {
   FUR_LENGTH_LABEL,
 } from '../../../src/types';
 
+// Cálculos para grid de 2 colunas responsivo
 const COLUMN_GAP = 12;
 const HORIZONTAL_PADDING = 20;
 const NUM_COLUMNS = 2;
 const CARD_WIDTH =
   (Dimensions.get('window').width - HORIZONTAL_PADDING * 2 - COLUMN_GAP) / NUM_COLUMNS;
 
+// Tela do catálogo — lista todos os pets disponíveis em grade com filtros
 export default function CatalogScreen() {
   const router = useRouter();
   const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterVisible, setFilterVisible] = useState(false);
   const { filters, activeCount } = useFiltersStore();
 
   const count = activeCount();
 
+  // Função de busca extraída para poder ser chamada no retry
+  const fetchPets = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    // Monta objeto de filtros removendo valores undefined/vazios
+    const cleanFilters: PetFilters = {};
+    if (filters.species) cleanFilters.species = filters.species;
+    if (filters.sex) cleanFilters.sex = filters.sex;
+    if (filters.size) cleanFilters.size = filters.size;
+    if (filters.furLength) cleanFilters.furLength = filters.furLength;
+    if (filters.neutered !== undefined) cleanFilters.neutered = filters.neutered;
+    if (filters.city) cleanFilters.city = filters.city;
+    if (filters.neighborhood) cleanFilters.neighborhood = filters.neighborhood;
+
+    // Busca pets no Firestore com os filtros aplicados
+    getPets(Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined)
+      .then((data) => setPets(data))
+      .catch(() => setError('Não foi possível carregar os pets. Verifique sua conexão.'))
+      .finally(() => setLoading(false));
+  }, [filters]);
+
+  // Recarrega os pets toda vez que a tela ganha foco ou os filtros mudam
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-
-      setLoading(true);
-      const cleanFilters: PetFilters = {};
-      if (filters.species) cleanFilters.species = filters.species;
-      if (filters.sex) cleanFilters.sex = filters.sex;
-      if (filters.size) cleanFilters.size = filters.size;
-      if (filters.furLength) cleanFilters.furLength = filters.furLength;
-      if (filters.neutered !== undefined) cleanFilters.neutered = filters.neutered;
-      if (filters.city) cleanFilters.city = filters.city;
-      if (filters.neighborhood) cleanFilters.neighborhood = filters.neighborhood;
-
-      getPets(Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined)
-        .then((data) => {
-          if (active) setPets(data);
-        })
-        .catch(() => {
-          if (active) setPets([]);
-        })
-        .finally(() => {
-          if (active) setLoading(false);
-        });
-
-      return () => {
-        active = false;
-      };
-    }, [filters])
+      fetchPets();
+    }, [fetchPets])
   );
 
   return (
     <View style={styles.container}>
+      {/* Header com título e botão de filtros (exibe contador de filtros ativos) */}
       <View style={styles.header}>
         <Text style={styles.title}>Catálogo</Text>
         <TouchableOpacity
@@ -90,14 +93,15 @@ export default function CatalogScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#E87722" />
-        </View>
+        <LoadingOverlay />
+      ) : error ? (
+        <ErrorMessage message={error} onRetry={fetchPets} />
       ) : pets.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.emptyText}>Nenhum pet disponível no momento</Text>
         </View>
       ) : (
+        // Grade de 2 colunas com cards de pets
         <FlatList
           data={pets}
           keyExtractor={(item) => item.id}
@@ -113,6 +117,7 @@ export default function CatalogScreen() {
               <View style={styles.cardContent}>
                 <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
                 <Text style={styles.cardInfo}>{SPECIES_LABEL[item.species]}</Text>
+                {/* Formata idade: meses se < 12, anos caso contrário */}
                 <Text style={styles.cardInfo}>
                   {item.ageMonths < 12
                     ? `${item.ageMonths} ${item.ageMonths === 1 ? 'mês' : 'meses'}`
@@ -126,11 +131,13 @@ export default function CatalogScreen() {
         />
       )}
 
+      {/* Modal de filtros */}
       <FilterModal visible={filterVisible} onClose={() => setFilterVisible(false)} />
     </View>
   );
 }
 
+// Modal com todos os filtros disponíveis para o catálogo
 function FilterModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { filters, setFilter, clearFilters } = useFiltersStore();
 
@@ -144,6 +151,7 @@ function FilterModal({ visible, onClose }: { visible: boolean; onClose: () => vo
           </TouchableOpacity>
         </View>
 
+        {/* Filtro por espécie (Cão/Gato) */}
         <Text style={styles.filterLabel}>Espécie</Text>
         <OptionRow
           options={Object.entries(SPECIES_LABEL) as [PetSpecies, string][]}
@@ -151,6 +159,7 @@ function FilterModal({ visible, onClose }: { visible: boolean; onClose: () => vo
           onChange={(v) => setFilter('species', filters.species === v ? undefined : v)}
         />
 
+        {/* Filtro por sexo (Macho/Fêmea) */}
         <Text style={styles.filterLabel}>Sexo</Text>
         <OptionRow
           options={Object.entries(SEX_LABEL) as [PetSex, string][]}
@@ -158,6 +167,7 @@ function FilterModal({ visible, onClose }: { visible: boolean; onClose: () => vo
           onChange={(v) => setFilter('sex', filters.sex === v ? undefined : v)}
         />
 
+        {/* Filtro por porte (Pequeno/Médio/Grande) */}
         <Text style={styles.filterLabel}>Porte</Text>
         <OptionRow
           options={Object.entries(SIZE_LABEL) as [PetSize, string][]}
@@ -165,6 +175,7 @@ function FilterModal({ visible, onClose }: { visible: boolean; onClose: () => vo
           onChange={(v) => setFilter('size', filters.size === v ? undefined : v)}
         />
 
+        {/* Filtro por tamanho dos pelos */}
         <Text style={styles.filterLabel}>Tamanho dos pelos</Text>
         <OptionRow
           options={Object.entries(FUR_LENGTH_LABEL) as [FurLength, string][]}
@@ -172,6 +183,7 @@ function FilterModal({ visible, onClose }: { visible: boolean; onClose: () => vo
           onChange={(v) => setFilter('furLength', filters.furLength === v ? undefined : v)}
         />
 
+        {/* Toggle para filtrar apenas castrados */}
         <View style={styles.switchRow}>
           <Text style={styles.filterLabel}>Apenas castrados</Text>
           <Switch
@@ -181,6 +193,7 @@ function FilterModal({ visible, onClose }: { visible: boolean; onClose: () => vo
           />
         </View>
 
+        {/* Filtros de localização (texto livre) */}
         <Text style={styles.filterLabel}>Cidade</Text>
         <TextInput
           style={styles.textInput}
@@ -197,6 +210,7 @@ function FilterModal({ visible, onClose }: { visible: boolean; onClose: () => vo
           placeholder="Ex: Vila Madalena"
         />
 
+        {/* Ações: limpar filtros ou aplicar */}
         <View style={styles.modalActions}>
           <TouchableOpacity
             style={styles.clearButton}
@@ -214,6 +228,7 @@ function FilterModal({ visible, onClose }: { visible: boolean; onClose: () => vo
   );
 }
 
+// Componente genérico de seleção por botões (toggle — toque de novo desmarca)
 function OptionRow<T extends string>({
   options,
   value,
@@ -311,7 +326,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#888',
   },
-  // Modal
   modalContainer: {
     flex: 1,
     backgroundColor: '#fff',

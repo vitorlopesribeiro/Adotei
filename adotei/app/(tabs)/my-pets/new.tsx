@@ -1,4 +1,4 @@
-            import {
+import {
   View,
   Text,
   TextInput,
@@ -13,11 +13,15 @@
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../../src/config/firebase';
 import * as ImagePicker from 'expo-image-picker';
 import { petSchema, PetFormValues } from '../../../src/schemas/pet.schema';
 import { createPet } from '../../../src/services/pets.service';
 import { useAuthStore } from '../../../src/stores/auth.store';
+import { LoadingOverlay } from '../../../src/components/ui/LoadingOverlay';
+import { User } from '../../../src/types';
 import {
   SPECIES_LABEL,
   SEX_LABEL,
@@ -29,12 +33,34 @@ import {
   FurLength,
 } from '../../../src/types';
 
+// Tela de cadastro de pet — formulário completo com foto, dados e localização
 export default function NewPetScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [hasCpf, setHasCpf] = useState(true);
+  const [checkingCpf, setCheckingCpf] = useState(true);
 
+  // RN06: Verifica se o usuário tem CPF válido cadastrado antes de permitir publicar pets
+  useEffect(() => {
+    if (!user) return;
+    setCheckingCpf(true);
+    getDoc(doc(db, 'users', user.uid))
+      .then((snap) => {
+        if (snap.exists()) {
+          const profile = snap.data() as User;
+          // CPF é armazenado criptografado — se existir e não estiver vazio, é válido
+          setHasCpf(!!profile.cpf);
+        } else {
+          setHasCpf(false);
+        }
+      })
+      .catch(() => setHasCpf(false))
+      .finally(() => setCheckingCpf(false));
+  }, [user]);
+
+  // React Hook Form com validação Zod (petSchema)
   const {
     control,
     handleSubmit,
@@ -48,18 +74,20 @@ export default function NewPetScreen() {
     },
   });
 
+  // Abre a galeria do dispositivo para selecionar foto do pet
   async function pickImage() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      aspect: [1, 1],    // Crop quadrado para uniformidade no catálogo
+      quality: 0.8,       // Comprime para reduzir tamanho do upload
     });
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
     }
   }
 
+  // Submete o formulário: cria o pet no Firestore + upload da foto no Cloudinary
   async function onSubmit(data: PetFormValues) {
     if (!imageUri) {
       Alert.alert('Foto obrigatória', 'Selecione uma foto do pet.');
@@ -70,6 +98,7 @@ export default function NewPetScreen() {
     setLoading(true);
     try {
       await createPet(data, imageUri, user.uid);
+      // Após sucesso, redireciona para a lista "Meus Pets"
       router.replace('/(tabs)/my-pets');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Erro ao cadastrar pet.';
@@ -79,11 +108,30 @@ export default function NewPetScreen() {
     }
   }
 
+  // Loading enquanto verifica CPF
+  if (checkingCpf) {
+    return <LoadingOverlay />;
+  }
+
+  // RN06: Bloqueia cadastro de pet se usuário não tem CPF válido
+  if (!hasCpf) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#fff' }}>
+        <Text style={{ fontSize: 18, fontWeight: '600', color: '#1a1a1a', textAlign: 'center', marginBottom: 8 }}>
+          CPF obrigatório
+        </Text>
+        <Text style={{ fontSize: 15, color: '#666', textAlign: 'center' }}>
+          Você precisa ter um CPF válido cadastrado no seu perfil para publicar pets.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Cadastrar pet</Text>
 
-      {/* Foto */}
+      {/* Seletor de foto com preview */}
       <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
         {imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.photoPreview} />
@@ -92,6 +140,7 @@ export default function NewPetScreen() {
         )}
       </TouchableOpacity>
 
+      {/* Nome do pet */}
       <Field label="Nome" error={errors.name?.message}>
         <Controller
           control={control}
@@ -102,6 +151,7 @@ export default function NewPetScreen() {
         />
       </Field>
 
+      {/* Seletores de características com botões de opção */}
       <Field label="Espécie" error={errors.species?.message}>
         <Controller
           control={control}
@@ -158,6 +208,7 @@ export default function NewPetScreen() {
         />
       </Field>
 
+      {/* Cor dos pelos: campo de texto, nullable para pets sem pelo */}
       <Field label="Cor dos pelos (deixe vazio se sem pelo)" error={errors.furColor?.message}>
         <Controller
           control={control}
@@ -183,6 +234,7 @@ export default function NewPetScreen() {
         />
       </Field>
 
+      {/* Idade em meses (converte texto para número) */}
       <Field label="Idade (em meses)" error={errors.ageMonths?.message}>
         <Controller
           control={control}
@@ -199,6 +251,7 @@ export default function NewPetScreen() {
         />
       </Field>
 
+      {/* Toggle de castrado */}
       <View style={styles.switchRow}>
         <Text style={styles.label}>Castrado</Text>
         <Controller
@@ -227,6 +280,7 @@ export default function NewPetScreen() {
         />
       </Field>
 
+      {/* Seção de ponto de encontro (RN07: pode ser diferente do endereço pessoal) */}
       <Text style={styles.sectionTitle}>Ponto de encontro</Text>
 
       <Field label="Rua" error={errors.meetingLocation?.street?.message}>
@@ -309,6 +363,7 @@ export default function NewPetScreen() {
         </View>
       </View>
 
+      {/* Botão de submit com loading */}
       <TouchableOpacity style={styles.button} onPress={handleSubmit(onSubmit)} disabled={loading}>
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Cadastrar pet</Text>}
       </TouchableOpacity>
@@ -316,6 +371,7 @@ export default function NewPetScreen() {
   );
 }
 
+// Componente auxiliar para campo de formulário com label e erro
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <View style={{ marginBottom: 12 }}>
@@ -326,6 +382,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
   );
 }
 
+// Componente genérico de seleção por botões (similar ao catálogo, mas sem toggle)
 function OptionGroup<T extends string>({
   options,
   value,

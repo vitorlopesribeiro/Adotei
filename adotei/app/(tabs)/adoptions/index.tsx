@@ -19,43 +19,54 @@ import {
   rejectAdoption,
 } from '../../../src/services/adoptions.service';
 import { Adoption, Pet, User, ADOPTION_STATUS_LABEL, AdoptionStatus } from '../../../src/types';
+import { LoadingOverlay } from '../../../src/components/ui/LoadingOverlay';
+import { ErrorMessage } from '../../../src/components/ui/ErrorMessage';
 
 type Tab = 'sent' | 'received';
 
+// Tipo estendido com dados adicionais do pet e do outro usuário para exibição
 interface AdoptionWithDetails extends Adoption {
   petName: string;
   otherUserName: string;
   otherUserPhone: string;
 }
 
+// Cores dos badges de status das adoções
 const STATUS_COLORS: Record<AdoptionStatus, string> = {
-  pending: '#d69e2e',
-  confirmed: '#38a169',
-  rejected: '#e53e3e',
+  pending: '#d69e2e',    // Amarelo
+  confirmed: '#38a169',  // Verde
+  rejected: '#e53e3e',   // Vermelho
 };
 
+// Tela de adoções — abas "Enviados" (solicitações feitas) e "Recebidos" (solicitações recebidas)
 export default function AdoptionsScreen() {
   const { user } = useAuthStore();
   const [tab, setTab] = useState<Tab>('sent');
   const [sentItems, setSentItems] = useState<AdoptionWithDetails[]>([]);
   const [receivedItems, setReceivedItems] = useState<AdoptionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Carrega todas as adoções (enviadas + recebidas) e enriquece com dados do pet e usuário
   const loadData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    setError(null);
 
     try {
+      // Busca em paralelo as adoções enviadas e recebidas
       const [sent, received] = await Promise.all([
         getSentAdoptions(user.uid),
         getReceivedAdoptions(user.uid),
       ]);
 
+      // Enriquece cada adoção com nome do pet e dados do outro usuário
       const enriched = await Promise.all(
         [...sent, ...received].map(async (adoption) => {
           const [petSnap, otherSnap] = await Promise.all([
             getDoc(doc(db, 'pets', adoption.petId)),
+            // Busca o "outro" usuário: se eu sou adotante, busca o doador e vice-versa
             getDoc(
               doc(
                 db,
@@ -76,22 +87,24 @@ export default function AdoptionsScreen() {
         })
       );
 
+      // Separa em enviados e recebidos para as respectivas abas
       setSentItems(enriched.filter((a) => a.adopterId === user.uid));
       setReceivedItems(enriched.filter((a) => a.donorId === user.uid));
     } catch {
-      setSentItems([]);
-      setReceivedItems([]);
+      setError('Não foi possível carregar as adoções. Verifique sua conexão.');
     } finally {
       setLoading(false);
     }
   }, [user]);
 
+  // Recarrega ao ganhar foco
   useFocusEffect(
     useCallback(() => {
       loadData();
     }, [loadData])
   );
 
+  // RN01: Confirma a adoção (muda pet para "adopted" + envia e-mail)
   async function handleConfirm(adoptionId: string) {
     Alert.alert('Confirmar adoção', 'Tem certeza que deseja confirmar esta adoção?', [
       { text: 'Cancelar', style: 'cancel' },
@@ -114,6 +127,7 @@ export default function AdoptionsScreen() {
     ]);
   }
 
+  // RN01: Recusa a adoção (pet volta para "available")
   async function handleReject(adoptionId: string) {
     Alert.alert('Recusar adoção', 'Tem certeza que deseja recusar esta solicitação?', [
       { text: 'Cancelar', style: 'cancel' },
@@ -143,6 +157,7 @@ export default function AdoptionsScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Adoções</Text>
 
+      {/* Seletor de abas: Enviados / Recebidos */}
       <View style={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, tab === 'sent' && styles.tabActive]}
@@ -161,9 +176,9 @@ export default function AdoptionsScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#E87722" />
-        </View>
+        <LoadingOverlay />
+      ) : error ? (
+        <ErrorMessage message={error} onRetry={loadData} />
       ) : data.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.emptyText}>
@@ -179,6 +194,7 @@ export default function AdoptionsScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <View style={styles.card}>
+              {/* Header do card: nome do pet + badge de status */}
               <View style={styles.cardHeader}>
                 <Text style={styles.cardPetName}>{item.petName}</Text>
                 <View style={[styles.badge, { backgroundColor: STATUS_COLORS[item.status] }]}>
@@ -186,9 +202,11 @@ export default function AdoptionsScreen() {
                 </View>
               </View>
 
+              {/* Dados do outro usuário (doador ou adotante) */}
               <Text style={styles.cardInfo}>
                 {tab === 'sent' ? 'Doador' : 'Adotante'}: {item.otherUserName}
               </Text>
+              {/* Telefone visível apenas na aba "Recebidos" (para o doador contatar o adotante) */}
               {tab === 'received' && item.otherUserPhone && (
                 <Text style={styles.cardInfo}>Telefone: {item.otherUserPhone}</Text>
               )}
@@ -201,6 +219,7 @@ export default function AdoptionsScreen() {
                 </Text>
               )}
 
+              {/* RN01: Botões de ação visíveis apenas na aba "Recebidos" e para pedidos pendentes */}
               {tab === 'received' && item.status === 'pending' && (
                 <View style={styles.actions}>
                   {actionLoading === item.id ? (

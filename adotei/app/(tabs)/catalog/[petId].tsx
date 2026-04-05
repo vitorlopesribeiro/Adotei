@@ -15,6 +15,8 @@ import { db } from '../../../src/config/firebase';
 import { getPetById } from '../../../src/services/pets.service';
 import { requestAdoption } from '../../../src/services/adoptions.service';
 import { useAuthStore } from '../../../src/stores/auth.store';
+import { LoadingOverlay } from '../../../src/components/ui/LoadingOverlay';
+import { ErrorMessage } from '../../../src/components/ui/ErrorMessage';
 import { openWhatsApp } from '../../../src/utils/whatsapp.utils';
 import { openGoogleMaps } from '../../../src/utils/maps.utils';
 import {
@@ -27,54 +29,56 @@ import {
   PET_STATUS_LABEL,
 } from '../../../src/types';
 
+// Tela de detalhes do pet — exibe todas as informações + ações (WhatsApp, Maps, Adoção)
 export default function PetDetailScreen() {
+  // petId vem da rota dinâmica /catalog/[petId]
   const { petId } = useLocalSearchParams<{ petId: string }>();
   const { user } = useAuthStore();
   const [pet, setPet] = useState<Pet | null>(null);
   const [owner, setOwner] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Função de carregamento extraída para poder ser chamada no retry
+  async function loadData() {
     if (!petId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // Busca o pet pelo ID
+      const petData = await getPetById(petId);
+      setPet(petData);
 
-    async function loadData() {
-      try {
-        const petData = await getPetById(petId!);
-        setPet(petData);
-
-        const ownerSnap = await getDoc(doc(db, 'users', petData.ownerId));
-        if (ownerSnap.exists()) {
-          setOwner(ownerSnap.data() as User);
-        }
-      } catch {
-        Alert.alert('Erro', 'Não foi possível carregar os dados do pet.');
-      } finally {
-        setLoading(false);
+      // Busca o perfil do doador para exibir telefone (WhatsApp)
+      const ownerSnap = await getDoc(doc(db, 'users', petData.ownerId));
+      if (ownerSnap.exists()) {
+        setOwner(ownerSnap.data() as User);
       }
+    } catch {
+      setError('Não foi possível carregar os dados do pet.');
+    } finally {
+      setLoading(false);
     }
+  }
 
+  // Carrega dados do pet e do doador ao montar a tela
+  useEffect(() => {
     loadData();
   }, [petId]);
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#E87722" />
-      </View>
-    );
+    return <LoadingOverlay />;
   }
 
-  if (!pet) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>Pet não encontrado</Text>
-      </View>
-    );
+  if (error || !pet) {
+    return <ErrorMessage message={error ?? 'Pet não encontrado.'} onRetry={loadData} />;
   }
 
+  // RN03: Verifica se o usuário logado é o dono do pet
   const isOwner = user?.uid === pet.ownerId;
   const isAvailable = pet.status === 'available';
 
+  // Formata a idade para exibição (meses ou anos)
   const ageText =
     pet.ageMonths < 12
       ? `${pet.ageMonths} ${pet.ageMonths === 1 ? 'mês' : 'meses'}`
@@ -82,8 +86,10 @@ export default function PetDetailScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Foto principal do pet (Cloudinary) */}
       <Image source={{ uri: pet.photoUrl }} style={styles.photo} />
 
+      {/* Nome e badge de status */}
       <View style={styles.header}>
         <Text style={styles.name}>{pet.name}</Text>
         <View style={[styles.statusBadge, !isAvailable && styles.statusUnavailable]}>
@@ -93,6 +99,7 @@ export default function PetDetailScreen() {
 
       <Text style={styles.description}>{pet.description}</Text>
 
+      {/* Características detalhadas do pet (labels em PT-BR) */}
       <View style={styles.infoSection}>
         <Text style={styles.sectionTitle}>Características</Text>
         <InfoRow label="Espécie" value={SPECIES_LABEL[pet.species]} />
@@ -105,13 +112,16 @@ export default function PetDetailScreen() {
         <InfoRow label="Castrado" value={pet.neutered ? 'Sim' : 'Não'} />
       </View>
 
+      {/* Endereço do ponto de encontro */}
       <View style={styles.infoSection}>
         <Text style={styles.sectionTitle}>Ponto de encontro</Text>
         <Text style={styles.address}>{pet.meetingLocation.formattedAddress}</Text>
       </View>
 
+      {/* Botões de ação — visíveis apenas se o pet está disponível */}
       {isAvailable && (
         <View style={styles.actions}>
+          {/* Botão WhatsApp: abre conversa com o doador */}
           {owner && (
             <TouchableOpacity
               style={styles.whatsappButton}
@@ -121,6 +131,7 @@ export default function PetDetailScreen() {
             </TouchableOpacity>
           )}
 
+          {/* Botão Maps: abre o Google Maps com o endereço do ponto de encontro */}
           <TouchableOpacity
             style={styles.mapsButton}
             onPress={() => openGoogleMaps(pet.meetingLocation.formattedAddress)}
@@ -128,11 +139,13 @@ export default function PetDetailScreen() {
             <Text style={styles.buttonText}>Ver no Maps</Text>
           </TouchableOpacity>
 
+          {/* RN03: Botão de adoção oculto se o pet é do próprio usuário */}
           {!isOwner && (
             <TouchableOpacity
               style={styles.adoptButton}
               onPress={() => {
                 if (!user) return;
+                // Confirmação antes de solicitar a adoção
                 Alert.alert('Solicitar adoção', `Deseja solicitar a adoção de ${pet.name}?`, [
                   { text: 'Cancelar', style: 'cancel' },
                   {
@@ -141,6 +154,7 @@ export default function PetDetailScreen() {
                       try {
                         await requestAdoption(pet.id, user.uid);
                         Alert.alert('Sucesso', 'Solicitação de adoção enviada!');
+                        // Recarrega o pet para atualizar o status na tela
                         const updated = await getPetById(pet.id);
                         setPet(updated);
                       } catch (err: unknown) {
@@ -161,6 +175,7 @@ export default function PetDetailScreen() {
   );
 }
 
+// Componente de linha de informação (label: valor)
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.infoRow}>
